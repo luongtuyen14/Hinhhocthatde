@@ -1,6 +1,7 @@
+
 import React, { useState, useEffect, useRef } from 'react';
 import { ChatMessage, GeometryData } from '../types';
-import { Mic, MicOff, Send, Volume2, VolumeX, MessageSquare, Paperclip, X, BrainCircuit, Lightbulb, ListChecks, HelpCircle, Camera, Image as ImageIcon, ClipboardPaste } from 'lucide-react';
+import { Send, MessageSquare, X, BrainCircuit, Lightbulb, Camera, Image as ImageIcon } from 'lucide-react';
 
 interface ChatInterfaceProps {
   messages: ChatMessage[];
@@ -17,19 +18,13 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
   messages,
   onSendMessage,
   isLoading,
-  isVoiceEnabled,
-  toggleVoice,
   geometryData,
-  currentStepIndex,
-  setCurrentStepIndex
 }) => {
   const [input, setInput] = useState("");
-  const [isListening, setIsListening] = useState(false);
   const [activeTab, setActiveTab] = useState<'chat' | 'solution' | 'reasoning'>('chat');
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
   
   const messagesEndRef = useRef<HTMLDivElement>(null);
-  const recognitionRef = useRef<any>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const cameraInputRef = useRef<HTMLInputElement>(null);
 
@@ -39,7 +34,6 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
     }
   }, [messages, activeTab]);
 
-  // Handle Clipboard Paste (Ctrl+V)
   const handlePaste = (e: React.ClipboardEvent) => {
     const items = e.clipboardData.items;
     for (let i = 0; i < items.length; i++) {
@@ -47,34 +41,11 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
         const blob = items[i].getAsFile();
         if (blob) {
           const reader = new FileReader();
-          reader.onload = (event) => {
-            setSelectedImage(event.target?.result as string);
-          };
+          reader.onload = (event) => setSelectedImage(event.target?.result as string);
           reader.readAsDataURL(blob);
         }
       }
     }
-  };
-
-  useEffect(() => {
-    if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
-      const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
-      recognitionRef.current = new SpeechRecognition();
-      recognitionRef.current.continuous = false;
-      recognitionRef.current.lang = 'vi-VN';
-      recognitionRef.current.onresult = (event: any) => {
-        const transcript = event.results[0][0].transcript;
-        setInput(transcript);
-        setIsListening(false);
-      };
-      recognitionRef.current.onend = () => setIsListening(false);
-    }
-  }, []);
-
-  const toggleListening = () => {
-    if (!recognitionRef.current) return;
-    if (isListening) recognitionRef.current.stop();
-    else { recognitionRef.current.start(); setIsListening(true); }
   };
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -88,72 +59,68 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
   };
 
   const handleSend = () => {
-    if ((!input.trim() && !selectedImage)) return;
+    if (!input.trim() && !selectedImage) return;
     onSendMessage(input.trim(), selectedImage || undefined);
     setInput("");
     setSelectedImage(null);
   };
 
   useEffect(() => {
-    if (geometryData?.reasoning && geometryData.reasoning.length > 0) setActiveTab('reasoning');
+    if (geometryData?.reasoning?.length) setActiveTab('reasoning');
     else if (geometryData?.mathSolution) setActiveTab('solution');
   }, [geometryData]);
 
   return (
-    <div className="flex flex-col h-full bg-white" onPaste={handlePaste}>
-      {/* Tabs */}
-      <div className="flex border-b border-slate-100 bg-slate-50/50">
-        <button onClick={() => setActiveTab('chat')} className={`flex-1 py-2 text-xs font-bold flex items-center justify-center gap-1 ${activeTab === 'chat' ? 'text-blue-600 border-b-2 border-blue-600 bg-white' : 'text-slate-500'}`}><MessageSquare size={14}/> Chat</button>
-        <button onClick={() => setActiveTab('reasoning')} disabled={!(geometryData?.reasoning?.length)} className={`flex-1 py-2 text-xs font-bold flex items-center justify-center gap-1 ${activeTab === 'reasoning' ? 'text-amber-600 border-b-2 border-amber-600 bg-white' : 'text-slate-400'}`}><Lightbulb size={14}/> Gợi ý</button>
-        <button onClick={() => setActiveTab('solution')} disabled={!geometryData?.mathSolution} className={`flex-1 py-2 text-xs font-bold flex items-center justify-center gap-1 ${activeTab === 'solution' ? 'text-emerald-600 border-b-2 border-emerald-600 bg-white' : 'text-slate-400'}`}><BrainCircuit size={14}/> Giải</button>
+    <div className="flex flex-col h-full bg-white text-slate-800" onPaste={handlePaste}>
+      {/* Tiny Tabs */}
+      <div className="flex border-b border-slate-100 bg-slate-50">
+        <button onClick={() => setActiveTab('chat')} className={`flex-1 py-1.5 text-[10px] font-bold flex items-center justify-center gap-1 transition-colors ${activeTab === 'chat' ? 'text-blue-600 bg-white border-b-2 border-blue-600' : 'text-slate-400'}`}><MessageSquare size={12}/> CHAT</button>
+        <button onClick={() => setActiveTab('reasoning')} disabled={!geometryData?.reasoning?.length} className={`flex-1 py-1.5 text-[10px] font-bold flex items-center justify-center gap-1 transition-colors ${activeTab === 'reasoning' ? 'text-amber-600 bg-white border-b-2 border-amber-600' : 'text-slate-300 disabled:opacity-50'}`}><Lightbulb size={12}/> GỢI Ý</button>
+        <button onClick={() => setActiveTab('solution')} disabled={!geometryData?.mathSolution} className={`flex-1 py-1.5 text-[10px] font-bold flex items-center justify-center gap-1 transition-colors ${activeTab === 'solution' ? 'text-emerald-600 bg-white border-b-2 border-emerald-600' : 'text-slate-300 disabled:opacity-50'}`}><BrainCircuit size={12}/> GIẢI</button>
       </div>
 
       <div className="flex-1 overflow-hidden relative flex flex-col">
         {activeTab === 'chat' && (
           <>
-            <div className="flex-1 overflow-y-auto p-4 space-y-4 scrollbar-hide bg-slate-50/30">
+            <div className="flex-1 overflow-y-auto p-3 space-y-3 scrollbar-hide bg-slate-50/20">
               {messages.map((msg) => (
                 <div key={msg.id} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-                  <div className={`max-w-[85%] rounded-2xl p-3 text-sm shadow-sm ${msg.role === 'user' ? 'bg-blue-600 text-white' : 'bg-white border border-slate-200'}`}>
+                  <div className={`max-w-[90%] rounded-xl p-2.5 text-xs shadow-sm ${msg.role === 'user' ? 'bg-blue-600 text-white' : 'bg-white border border-slate-200'}`}>
                     {msg.text}
                   </div>
                 </div>
               ))}
-              {isLoading && <div className="text-xs text-slate-400 animate-pulse">AI đang suy nghĩ...</div>}
+              {isLoading && <div className="text-[10px] text-slate-400 animate-pulse ml-1">Đang xử lý...</div>}
               <div ref={messagesEndRef} />
             </div>
 
-            <div className="p-3 border-t bg-white">
+            <div className="p-2 border-t bg-white">
               {selectedImage && (
-                <div className="mb-2 relative inline-block group">
-                  <img src={selectedImage} alt="Preview" className="h-20 rounded-lg border shadow-sm object-cover" />
-                  <button onClick={() => setSelectedImage(null)} className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1 shadow-md hover:bg-red-600"><X size={12} /></button>
+                <div className="mb-2 relative inline-block">
+                  <img src={selectedImage} alt="Preview" className="h-14 rounded-md border object-cover" />
+                  <button onClick={() => setSelectedImage(null)} className="absolute -top-1.5 -right-1.5 bg-red-500 text-white rounded-full p-0.5 shadow-md"><X size={10} /></button>
                 </div>
               )}
               
-              <div className="flex items-center gap-2">
-                <div className="flex gap-1 shrink-0">
-                  <input type="file" ref={cameraInputRef} className="hidden" accept="image/*" capture="environment" onChange={handleFileSelect} />
-                  <button onClick={() => cameraInputRef.current?.click()} className="p-2 bg-slate-100 text-slate-600 rounded-xl hover:bg-blue-50" title="Chụp ảnh"><Camera size={20}/></button>
-                  
-                  <input type="file" ref={fileInputRef} className="hidden" accept="image/*" onChange={handleFileSelect} />
-                  <button onClick={() => fileInputRef.current?.click()} className="p-2 bg-slate-100 text-slate-600 rounded-xl hover:bg-blue-50" title="Chọn từ máy"><ImageIcon size={20}/></button>
-                </div>
+              <div className="flex items-center gap-1.5">
+                <button onClick={() => cameraInputRef.current?.click()} className="p-1.5 text-slate-400 hover:text-blue-500 transition-colors"><Camera size={18}/></button>
+                <input type="file" ref={cameraInputRef} className="hidden" accept="image/*" capture="environment" onChange={handleFileSelect} />
+                
+                <button onClick={() => fileInputRef.current?.click()} className="p-1.5 text-slate-400 hover:text-blue-500 transition-colors"><ImageIcon size={18}/></button>
+                <input type="file" ref={fileInputRef} className="hidden" accept="image/*" onChange={handleFileSelect} />
 
-                <div className="flex-1">
-                  <input 
-                    type="text" 
-                    value={input} 
-                    onChange={(e) => setInput(e.target.value)} 
-                    onKeyDown={(e) => e.key === 'Enter' && handleSend()} 
-                    placeholder="Hỏi AI hoặc dán ảnh..." 
-                    className="w-full px-4 py-2 text-sm rounded-xl border-2 border-slate-100 focus:border-blue-500 bg-slate-50 outline-none"
-                    disabled={isLoading}
-                  />
-                </div>
+                <input 
+                  type="text" 
+                  value={input} 
+                  onChange={(e) => setInput(e.target.value)} 
+                  onKeyDown={(e) => e.key === 'Enter' && handleSend()} 
+                  placeholder="Nhập câu hỏi..." 
+                  className="flex-1 px-3 py-1.5 text-xs rounded-lg border border-slate-200 bg-slate-50 outline-none focus:border-blue-400"
+                  disabled={isLoading}
+                />
 
-                <button onClick={handleSend} disabled={isLoading || (!input.trim() && !selectedImage)} className="p-2 bg-blue-600 text-white rounded-xl hover:bg-blue-700 disabled:opacity-50 shadow-md">
-                   <Send size={20} />
+                <button onClick={handleSend} disabled={isLoading || (!input.trim() && !selectedImage)} className="p-1.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-30 transition-all active:scale-90">
+                   <Send size={16} />
                 </button>
               </div>
             </div>
@@ -161,23 +128,21 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
         )}
 
         {activeTab === 'reasoning' && (
-          <div className="flex-1 overflow-y-auto p-4 space-y-3 bg-slate-50">
+          <div className="flex-1 overflow-y-auto p-3 space-y-2 bg-slate-50">
             {geometryData?.reasoning?.map((step, idx) => (
-              <div key={idx} className="p-3 bg-white rounded-xl border border-slate-200 shadow-sm">
-                <div className="text-xs font-bold text-amber-600 mb-1">Gợi ý {idx+1}</div>
-                <div className="text-sm font-semibold text-slate-800">{step.question}</div>
-                <div className="text-xs text-slate-500 mt-1 italic">💡 {step.answer}</div>
+              <div key={idx} className="p-2 bg-white rounded-lg border border-slate-100 shadow-sm">
+                <div className="text-[9px] font-bold text-amber-600 mb-0.5 uppercase">Bước {idx+1}</div>
+                <div className="text-xs font-semibold text-slate-700 leading-tight">{step.question}</div>
+                <div className="text-[10px] text-slate-500 mt-1 bg-amber-50/50 p-1 rounded">💡 {step.answer}</div>
               </div>
             ))}
           </div>
         )}
 
         {activeTab === 'solution' && (
-          <div className="flex-1 overflow-y-auto p-4 bg-slate-50">
-            <div className="bg-white rounded-xl p-4 border shadow-sm prose prose-sm max-w-none">
-              <div className="whitespace-pre-line text-sm leading-relaxed text-slate-700">
-                {geometryData?.mathSolution}
-              </div>
+          <div className="flex-1 overflow-y-auto p-3 bg-slate-50">
+            <div className="bg-white rounded-lg p-3 border shadow-sm text-xs leading-relaxed text-slate-700 whitespace-pre-line">
+              {geometryData?.mathSolution}
             </div>
           </div>
         )}

@@ -1,9 +1,9 @@
 
-import { GoogleGenAI, Type, Schema } from "@google/genai";
+import { GoogleGenAI, Type } from "@google/genai";
 import { GeometryData } from "../types";
 
 // Define the response schema for Gemini
-const geometrySchema: Schema = {
+const geometrySchema = {
   type: Type.OBJECT,
   properties: {
     points: {
@@ -138,6 +138,7 @@ export const generateGeometry = async (prompt: string, history: string = "", ima
     throw new Error("API Key is missing");
   }
 
+  // Create a new instance right before generating content to ensure the latest API key is used.
   const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
   
   try {
@@ -158,9 +159,8 @@ export const generateGeometry = async (prompt: string, history: string = "", ima
 
     const response = await ai.models.generateContent({
       model: "gemini-3-pro-preview",
-      contents: [
-        { role: "user", parts: parts }
-      ],
+      // Contents should be an object with parts for consistency with the SDK's recommended patterns.
+      contents: { parts: parts },
       config: {
         systemInstruction: SYSTEM_INSTRUCTION,
         responseMimeType: "application/json",
@@ -169,6 +169,7 @@ export const generateGeometry = async (prompt: string, history: string = "", ima
       },
     });
 
+    // Access the text property directly on the response.
     const text = response.text;
     if (!text) throw new Error("No response from AI");
     

@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useRef } from 'react';
 import Canvas from './components/Canvas';
 import ChatInterface from './components/ChatInterface';
@@ -5,19 +6,17 @@ import { GeometryData, ChatMessage, Project } from './types';
 import { generateGeometry } from './services/geminiService';
 import { 
   Menu, Plus, Calculator, X, 
-  FolderOpen, Edit2, Trash2, Save, Copy, Download, Upload, Check,
-  Sigma, Pi, Triangle, MessageSquare, ChevronRight, GripVertical
+  Triangle, MessageSquare, Minimize2, Trash2
 } from 'lucide-react';
 
 const DEFAULT_WELCOME_MSG: ChatMessage = {
   id: 'welcome',
   role: 'model',
-  text: 'Chào em! Thầy là trợ lý Toán học. Em có thể chụp ảnh đề bài hoặc nhắn tin để thầy hỗ trợ nhé!',
+  text: 'Chào em! Thầy là trợ lý Toán học. Em cần giúp gì về hình học không?',
   timestamp: Date.now()
 };
 
 const App: React.FC = () => {
-  // Global Project State
   const [projects, setProjects] = useState<Project[]>(() => {
      try {
        const saved = localStorage.getItem('hinh-hoc-ai-projects');
@@ -28,23 +27,24 @@ const App: React.FC = () => {
   });
   const [currentProjectId, setCurrentProjectId] = useState<string | null>(null);
 
-  // Renaming State
-  const [editingProjectId, setEditingProjectId] = useState<string | null>(null);
-  const [editingNameValue, setEditingNameValue] = useState("");
-
   // UI State
   const [isLoading, setIsLoading] = useState(false);
   const [isVoiceEnabled, setIsVoiceEnabled] = useState(false);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [isChatOpen, setIsChatOpen] = useState(false); 
   
-  // Floating Assistant Position State
-  const [bubblePos, setBubblePos] = useState({ x: window.innerWidth - 80, y: window.innerHeight - 150 });
+  // Position State
+  const [bubblePos, setBubblePos] = useState({ x: window.innerWidth - 80, y: window.innerHeight - 80 });
   const [isDragging, setIsDragging] = useState(false);
   const dragStartPos = useRef({ x: 0, y: 0 });
-  const fileInputRef = useRef<HTMLInputElement>(null);
+  const hasMovedRef = useRef(false);
 
-  // Initialize
+  // Compact Constants
+  const CHAT_WIDTH = window.innerWidth < 768 ? 280 : 340;
+  const CHAT_HEIGHT = 420;
+  const BUBBLE_SIZE = 56;
+  const MARGIN = 12;
+
   useEffect(() => {
     if (projects.length === 0) {
       createProject("Bài toán mới");
@@ -53,7 +53,17 @@ const App: React.FC = () => {
       setCurrentProjectId(mostRecent.id);
     }
     if (window.innerWidth > 1024) setIsSidebarOpen(true);
+    adjustToWindowSize();
+    window.addEventListener('resize', adjustToWindowSize);
+    return () => window.removeEventListener('resize', adjustToWindowSize);
   }, []);
+
+  const adjustToWindowSize = () => {
+    setBubblePos(prev => ({
+      x: Math.min(prev.x, window.innerWidth - BUBBLE_SIZE - MARGIN),
+      y: Math.min(prev.y, window.innerHeight - BUBBLE_SIZE - MARGIN)
+    }));
+  };
 
   useEffect(() => {
     localStorage.setItem('hinh-hoc-ai-projects', JSON.stringify(projects));
@@ -70,12 +80,13 @@ const App: React.FC = () => {
     ));
   };
 
-  // --- Drag Logic ---
   const handleDragStart = (e: React.MouseEvent | React.TouchEvent) => {
+    if ('button' in e && e.button !== 0) return;
     const clientX = 'touches' in e ? e.touches[0].clientX : e.clientX;
     const clientY = 'touches' in e ? e.touches[0].clientY : e.clientY;
     dragStartPos.current = { x: clientX - bubblePos.x, y: clientY - bubblePos.y };
     setIsDragging(true);
+    hasMovedRef.current = false;
   };
 
   const handleDragMove = (e: MouseEvent | TouchEvent) => {
@@ -86,16 +97,22 @@ const App: React.FC = () => {
     let newX = clientX - dragStartPos.current.x;
     let newY = clientY - dragStartPos.current.y;
 
-    // Constrain within screen
-    newX = Math.max(10, Math.min(window.innerWidth - (isChatOpen ? 360 : 70), newX));
-    newY = Math.max(10, Math.min(window.innerHeight - (isChatOpen ? 550 : 70), newY));
+    if (Math.abs(newX - bubblePos.x) > 3 || Math.abs(newY - bubblePos.y) > 3) {
+      hasMovedRef.current = true;
+    }
+
+    const minX = isChatOpen ? (CHAT_WIDTH - BUBBLE_SIZE + MARGIN) : MARGIN;
+    const maxX = window.innerWidth - BUBBLE_SIZE - MARGIN;
+    const minY = isChatOpen ? (CHAT_HEIGHT + MARGIN * 2) : MARGIN;
+    const maxY = window.innerHeight - BUBBLE_SIZE - MARGIN;
+
+    newX = Math.max(minX, Math.min(maxX, newX));
+    newY = Math.max(minY, Math.min(maxY, newY));
 
     setBubblePos({ x: newX, y: newY });
   };
 
-  const handleDragEnd = () => {
-    setIsDragging(false);
-  };
+  const handleDragEnd = () => setIsDragging(false);
 
   useEffect(() => {
     if (isDragging) {
@@ -112,7 +129,6 @@ const App: React.FC = () => {
     };
   }, [isDragging, isChatOpen]);
 
-  // --- Project Functions ---
   const createProject = (nameInput?: string) => {
     const name = nameInput || `Bài toán ${projects.length + 1}`;
     const newProj: Project = {
@@ -159,41 +175,41 @@ const App: React.FC = () => {
     <div className="h-screen w-screen flex bg-slate-100 overflow-hidden font-sans">
       
       {/* Sidebar Navigation */}
-      <div className={`fixed inset-y-0 left-0 z-40 w-72 bg-white border-r border-slate-200 transform transition-transform duration-300 ease-in-out md:relative md:translate-x-0 ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'} flex flex-col shadow-xl md:shadow-none`}>
-          <div className="p-4 border-b flex items-center justify-between bg-blue-50/50">
-            <h1 className="text-xl font-bold text-blue-900 flex items-center gap-2">
-              <Calculator size={24} className="text-blue-600" /> Toán THCS
+      <div className={`fixed inset-y-0 left-0 z-40 w-64 bg-white border-r border-slate-200 transform transition-transform duration-300 ease-in-out md:relative md:translate-x-0 ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'} flex flex-col shadow-xl md:shadow-none`}>
+          <div className="p-4 border-b flex items-center justify-between bg-blue-50/30">
+            <h1 className="text-lg font-bold text-blue-900 flex items-center gap-2">
+              <Calculator size={20} className="text-blue-600" /> Toán THCS
             </h1>
-            <button onClick={() => setIsSidebarOpen(false)} className="md:hidden text-slate-400"><X size={24} /></button>
+            <button onClick={() => setIsSidebarOpen(false)} className="md:hidden text-slate-400"><X size={20} /></button>
           </div>
 
-          <div className="p-4 shrink-0">
-            <button onClick={() => createProject()} className="w-full py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl shadow-lg flex items-center justify-center gap-2 transition-all font-bold"><Plus size={20} /> Bài toán mới</button>
+          <div className="p-3">
+            <button onClick={() => createProject()} className="w-full py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg shadow-md flex items-center justify-center gap-2 transition-all text-sm font-bold active:scale-95"><Plus size={16} /> Bài toán mới</button>
           </div>
 
-          <div className="flex-1 overflow-y-auto px-3 space-y-2">
+          <div className="flex-1 overflow-y-auto px-2 space-y-1 scrollbar-hide">
             {projects.map((proj) => (
               <div
                 key={proj.id}
                 onClick={() => { setCurrentProjectId(proj.id); if (window.innerWidth < 768) setIsSidebarOpen(false); }}
-                className={`group flex items-center gap-3 px-3 py-3 rounded-xl cursor-pointer border ${currentProjectId === proj.id ? 'bg-blue-50 border-blue-200' : 'hover:bg-slate-50 border-transparent'}`}
+                className={`group flex items-center gap-2 px-3 py-2 rounded-lg cursor-pointer border transition-all ${currentProjectId === proj.id ? 'bg-blue-50 border-blue-100' : 'hover:bg-slate-50 border-transparent'}`}
               >
-                <Triangle size={18} className={currentProjectId === proj.id ? 'text-blue-600' : 'text-slate-400'} />
+                <Triangle size={14} className={currentProjectId === proj.id ? 'text-blue-600' : 'text-slate-400'} />
                 <div className="flex-1 min-w-0">
-                  <div className={`font-medium truncate text-sm ${currentProjectId === proj.id ? 'text-blue-900' : 'text-slate-700'}`}>{proj.name}</div>
+                  <div className={`text-sm truncate ${currentProjectId === proj.id ? 'font-bold text-blue-900' : 'text-slate-600'}`}>{proj.name}</div>
                 </div>
-                <button onClick={(e) => deleteProject(proj.id, e)} className="hidden group-hover:block p-1 text-slate-400 hover:text-red-500"><Trash2 size={14}/></button>
+                <button onClick={(e) => deleteProject(proj.id, e)} className="opacity-0 group-hover:opacity-100 p-1 text-slate-400 hover:text-red-500 transition-opacity"><Trash2 size={12}/></button>
               </div>
             ))}
           </div>
       </div>
 
-      {isSidebarOpen && <div className="fixed inset-0 bg-black/20 z-30 md:hidden backdrop-blur-sm" onClick={() => setIsSidebarOpen(false)} />}
+      {isSidebarOpen && <div className="fixed inset-0 bg-black/10 z-30 md:hidden backdrop-blur-[2px]" onClick={() => setIsSidebarOpen(false)} />}
 
       {/* Canvas Area */}
       <div className="flex-1 h-full relative z-0">
-        <div className="absolute top-4 left-4 z-10 md:hidden">
-          <button onClick={() => setIsSidebarOpen(true)} className="p-3 bg-white rounded-full shadow-lg border border-slate-200 text-slate-700"><Menu size={24} /></button>
+        <div className="absolute top-3 left-3 z-10 md:hidden">
+          <button onClick={() => setIsSidebarOpen(true)} className="p-2 bg-white rounded-full shadow-md border border-slate-200 text-slate-600 active:scale-95"><Menu size={20} /></button>
         </div>
 
         <Canvas 
@@ -204,21 +220,39 @@ const App: React.FC = () => {
           onSpeak={(t) => { if(isVoiceEnabled) { window.speechSynthesis.cancel(); const u = new SpeechSynthesisUtterance(t); u.lang='vi-VN'; window.speechSynthesis.speak(u); } }}
         />
 
-        {/* Floating Mini AI Assistant */}
+        {/* Floating Mini AI Assistant Container */}
         <div 
-          className="fixed z-50 flex flex-col items-end pointer-events-none"
-          style={{ left: bubblePos.x, top: bubblePos.y }}
+          className={`fixed z-50 flex flex-col items-end pointer-events-none transition-opacity ${isDragging ? 'opacity-80' : 'opacity-100'}`}
+          style={{ 
+            left: bubblePos.x, 
+            top: bubblePos.y,
+            transform: 'translateY(-100%)' 
+          }}
         >
-          {/* Chat Window */}
+          {/* Compact Chat Window */}
           {isChatOpen && (
-            <div className="mb-4 w-[350px] md:w-[400px] h-[500px] bg-white rounded-3xl shadow-2xl border border-slate-200 flex flex-col overflow-hidden animate-in zoom-in-95 fade-in slide-in-from-bottom-10 pointer-events-auto origin-bottom-right">
-              <div className="p-4 border-b bg-blue-600 text-white flex items-center justify-between">
-                <div className="flex items-center gap-2 font-bold cursor-move" onMouseDown={handleDragStart} onTouchStart={handleDragStart}>
-                  <div className="bg-white/20 p-1 rounded-lg"><MessageSquare size={18}/></div>
-                  Trợ lý Toán học
+            <div 
+              className="mb-3 bg-white rounded-2xl shadow-2xl border border-slate-200 flex flex-col overflow-hidden animate-in zoom-in-95 fade-in slide-in-from-bottom-5 pointer-events-auto origin-bottom-right"
+              style={{ width: CHAT_WIDTH, height: CHAT_HEIGHT }}
+            >
+              {/* Compact Header */}
+              <div 
+                className="p-3 border-b bg-blue-600 text-white flex items-center justify-between cursor-move select-none"
+                onMouseDown={handleDragStart}
+                onTouchStart={handleDragStart}
+              >
+                <div className="flex items-center gap-2 font-bold text-sm pointer-events-none">
+                  <MessageSquare size={16}/>
+                  Gia sư AI
                 </div>
-                <button onClick={() => setIsChatOpen(false)} className="p-1 hover:bg-white/20 rounded-full"><X size={20}/></button>
+                <button 
+                  onClick={(e) => { e.stopPropagation(); setIsChatOpen(false); }} 
+                  className="p-1 hover:bg-white/20 rounded-md transition-colors"
+                >
+                  <Minimize2 size={16}/>
+                </button>
               </div>
+              
               <div className="flex-1 overflow-hidden">
                 <ChatInterface 
                   key={currentProjectId}
@@ -238,24 +272,28 @@ const App: React.FC = () => {
           {/* Assistant Bubble */}
           <div 
             className={`
-              w-16 h-16 rounded-full shadow-2xl flex items-center justify-center cursor-pointer pointer-events-auto transition-transform active:scale-95
-              ${isChatOpen ? 'bg-red-500 rotate-90' : 'bg-blue-600 hover:scale-105'}
+              w-14 h-14 rounded-full shadow-xl flex items-center justify-center cursor-pointer pointer-events-auto transition-all active:scale-90
+              transform translate-y-full
+              ${isChatOpen ? 'bg-white border-2 border-blue-600 scale-90 opacity-40 hover:opacity-100' : 'bg-blue-600 hover:scale-105'}
             `}
             onMouseDown={handleDragStart}
             onTouchStart={handleDragStart}
-            onClick={(e) => {
-               if (!isDragging) setIsChatOpen(!isChatOpen);
-            }}
+            onClick={(e) => { if (!hasMovedRef.current) setIsChatOpen(!isChatOpen); }}
           >
-            {isChatOpen ? <X size={28} className="text-white" /> : <div className="text-2xl">🤖</div>}
-            
-            {/* Drag Handle Indicator */}
-            <div className="absolute -top-2 left-1/2 -translate-x-1/2 opacity-0 hover:opacity-100 transition-opacity">
-              <GripVertical size={14} className="text-slate-400" />
-            </div>
+            {isChatOpen ? <X size={20} className="text-blue-600" /> : <div className="text-xl animate-bounce-subtle">🤖</div>}
           </div>
         </div>
       </div>
+      
+      <style>{`
+        @keyframes bounce-subtle {
+          0%, 100% { transform: translateY(0); }
+          50% { transform: translateY(-3px); }
+        }
+        .animate-bounce-subtle {
+          animation: bounce-subtle 3s infinite ease-in-out;
+        }
+      `}</style>
     </div>
   );
 };
