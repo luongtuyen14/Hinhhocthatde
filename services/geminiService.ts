@@ -112,25 +112,27 @@ const geometrySchema = {
 };
 
 const SYSTEM_INSTRUCTION = `
-Bạn là "Gia Sư Toán THCS" chuyên nghiệp, am hiểu chương trình Toán lớp 6, 7, 8, 9 của Việt Nam.
-Phong cách: Ngắn gọn, dễ hiểu, trực quan, hỗ trợ tối đa cho học sinh vùng cao.
+Bạn là "Gia Sư Toán THCS" chuyên nghiệp, am hiểu sâu sắc chương trình Toán lớp 6, 7, 8, 9 của Việt Nam.
+
+**YÊU CẦU QUAN TRỌNG VỀ NGÔN NGỮ:**
+1. **Ngôn ngữ chuẩn mực:** Sử dụng thuật ngữ toán học chính thống (Ví dụ: "Xét tam giác ABC", "Ta có", "Suy ra", "Mà", "Theo định lý Py-ta-go", "Theo tính chất đường trung tuyến", "Chứng minh tương tự").
+2. **Ký hiệu toán học:** Sử dụng các ký hiệu chuẩn trong phần 'mathSolution' như ∆ABC, ∠ABC hoặc $\\widehat{ABC}$, ⊥, ∥, ≡, ∽.
+3. **Cấu trúc trình bày:** Lời giải phải được trình bày theo phong cách sư phạm Việt Nam:
+   - Có lập luận logic từng bước.
+   - Trích dẫn định lý/tính chất làm căn cứ trong ngoặc đơn.
+   - Kết luận rõ ràng cho từng ý hỏi (a, b, c...).
 
 **NHIỆM VỤ:**
-1.  **Vẽ hình (Geometry):** 
-    *   Tạo hình vẽ chính xác, tỷ lệ chuẩn theo yêu cầu bài toán (tam giác, hình tròn, đường tròn nội tiếp/ngoại tiếp, v.v.).
-    *   Sử dụng "circles" cho các đường tròn (tâm và bán kính).
-    *   Tọa độ trung tâm khoảng (0,0).
-
-2.  **Tư duy & Phân tích (Reasoning):**
-    *   Cung cấp các bước suy luận logic phù hợp với trình độ THCS (lớp 6-9).
-    *   Chỉ tập trung vào nội dung văn bản để giải thích cho học sinh hiểu.
-    *   KHÔNG cần gắn ID của hình vẽ vào các bước suy luận.
+1. **Vẽ hình (Geometry):** 
+    - Tạo hình vẽ chính xác, tỷ lệ chuẩn.
+    - Gắn nhãn điểm đầy đủ (A, B, C...).
+2. **Phân tích gợi ý (Reasoning):** Đưa ra câu hỏi định hướng để học sinh tự tư duy thay vì xem lời giải ngay.
+3. **Lời giải chi tiết (mathSolution):** Trình bày bài giải hoàn chỉnh bằng ngôn ngữ toán học chuẩn mực nhất.
 
 **HƯỚNG DẪN VẼ HÌNH TRÒN:**
-- Khi bài toán yêu cầu vẽ đường tròn (O; R) hoặc đường tròn đi qua các điểm, hãy xác định tâm và tính toán bán kính phù hợp trong hệ tọa độ.
-- Luôn đảm bảo hình vẽ trực quan, sạch sẽ.
+- Xác định tâm và bán kính phù hợp trong hệ tọa độ sao cho hình vẽ cân đối.
 
-**OUTPUT:** Trả về JSON theo schema.
+**PHONG CÁCH:** Nghiêm túc nhưng thân thiện, hỗ trợ tối đa cho học sinh (đặc biệt là vùng khó khăn).
 `;
 
 export const generateGeometry = async (prompt: string, history: string = "", imageBase64?: string): Promise<GeometryData> => {
@@ -138,7 +140,6 @@ export const generateGeometry = async (prompt: string, history: string = "", ima
     throw new Error("API Key is missing");
   }
 
-  // Create a new instance right before generating content to ensure the latest API key is used.
   const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
   
   try {
@@ -159,7 +160,6 @@ export const generateGeometry = async (prompt: string, history: string = "", ima
 
     const response = await ai.models.generateContent({
       model: "gemini-3-pro-preview",
-      // Contents should be an object with parts for consistency with the SDK's recommended patterns.
       contents: { parts: parts },
       config: {
         systemInstruction: SYSTEM_INSTRUCTION,
@@ -169,7 +169,6 @@ export const generateGeometry = async (prompt: string, history: string = "", ima
       },
     });
 
-    // Access the text property directly on the response.
     const text = response.text;
     if (!text) throw new Error("No response from AI");
     
