@@ -1,3 +1,4 @@
+
 import { GoogleGenAI, Type, Schema } from "@google/genai";
 import { GeometryData } from "../types";
 
@@ -63,6 +64,21 @@ const geometrySchema: Schema = {
         required: ["id", "centerId", "arm1Id", "arm2Id", "type"]
       }
     },
+    circles: {
+      type: Type.ARRAY,
+      items: {
+        type: Type.OBJECT,
+        properties: {
+          id: { type: Type.STRING },
+          centerId: { type: Type.STRING, description: "ID of the center point" },
+          radius: { type: Type.NUMBER, description: "Radius length in geometry units" },
+          color: { type: Type.STRING, description: "Hex color" },
+          label: { type: Type.STRING, description: "Label for the circle (e.g., '(O)')" },
+          isDashed: { type: Type.BOOLEAN, description: "True if part of the circle is hidden/3D dashed line" }
+        },
+        required: ["id", "centerId", "radius"]
+      }
+    },
     steps: {
       type: Type.ARRAY,
       items: {
@@ -96,18 +112,23 @@ const geometrySchema: Schema = {
 };
 
 const SYSTEM_INSTRUCTION = `
-Bạn là "Gia Sư Toán THCS" chuyên nghiệp.
-Phong cách: Ngắn gọn, dễ hiểu, trực quan.
+Bạn là "Gia Sư Toán THCS" chuyên nghiệp, am hiểu chương trình Toán lớp 6, 7, 8, 9 của Việt Nam.
+Phong cách: Ngắn gọn, dễ hiểu, trực quan, hỗ trợ tối đa cho học sinh vùng cao.
 
 **NHIỆM VỤ:**
 1.  **Vẽ hình (Geometry):** 
-    *   Tạo hình vẽ chính xác, tỷ lệ chuẩn. 
+    *   Tạo hình vẽ chính xác, tỷ lệ chuẩn theo yêu cầu bài toán (tam giác, hình tròn, đường tròn nội tiếp/ngoại tiếp, v.v.).
+    *   Sử dụng "circles" cho các đường tròn (tâm và bán kính).
     *   Tọa độ trung tâm khoảng (0,0).
 
 2.  **Tư duy & Phân tích (Reasoning):**
-    *   Cung cấp các bước suy luận logic (Backward Reasoning).
+    *   Cung cấp các bước suy luận logic phù hợp với trình độ THCS (lớp 6-9).
     *   Chỉ tập trung vào nội dung văn bản để giải thích cho học sinh hiểu.
     *   KHÔNG cần gắn ID của hình vẽ vào các bước suy luận.
+
+**HƯỚNG DẪN VẼ HÌNH TRÒN:**
+- Khi bài toán yêu cầu vẽ đường tròn (O; R) hoặc đường tròn đi qua các điểm, hãy xác định tâm và tính toán bán kính phù hợp trong hệ tọa độ.
+- Luôn đảm bảo hình vẽ trực quan, sạch sẽ.
 
 **OUTPUT:** Trả về JSON theo schema.
 `;
@@ -117,7 +138,7 @@ export const generateGeometry = async (prompt: string, history: string = "", ima
     throw new Error("API Key is missing");
   }
 
-  const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
   
   try {
     const parts: any[] = [{ text: `Lịch sử chat:\n${history}\n\nYêu cầu mới của học sinh: ${prompt}` }];
@@ -136,7 +157,7 @@ export const generateGeometry = async (prompt: string, history: string = "", ima
     }
 
     const response = await ai.models.generateContent({
-      model: "gemini-2.5-flash",
+      model: "gemini-3-pro-preview",
       contents: [
         { role: "user", parts: parts }
       ],
@@ -144,7 +165,7 @@ export const generateGeometry = async (prompt: string, history: string = "", ima
         systemInstruction: SYSTEM_INSTRUCTION,
         responseMimeType: "application/json",
         responseSchema: geometrySchema,
-        temperature: 0.2, 
+        temperature: 0.1, 
       },
     });
 
@@ -158,6 +179,7 @@ export const generateGeometry = async (prompt: string, history: string = "", ima
       edges: parsed.edges || [],
       faces: parsed.faces || [],
       angles: parsed.angles || [],
+      circles: parsed.circles || [],
       steps: parsed.steps || [],
       reasoning: parsed.reasoning || [],
       type: parsed.type || '2D',

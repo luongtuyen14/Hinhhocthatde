@@ -1,3 +1,4 @@
+
 import React, { useMemo, useState, useEffect, useRef } from 'react';
 import { GeometryData, Point3D, Point2D, Edge, FreehandStroke } from '../types';
 import { projectPoint, get2DCentroid, getLabelPosition, get3DCentroid } from '../utils/geometryUtils';
@@ -47,7 +48,7 @@ const getMarkerPath = (type: string, p1: Point2D, p2: Point2D) => {
 
 const COLORS = ['#000000', '#ef4444', '#3b82f6', '#22c55e', '#eab308', '#a855f7', '#ec4899', '#cbd5e1'];
 
-interface SelectedElement { id: string; type: 'point' | 'edge' | 'face'; }
+interface SelectedElement { id: string; type: 'point' | 'edge' | 'face' | 'circle'; }
 
 const Canvas: React.FC<CanvasProps> = ({ data, currentStepIndex, onDataUpdate, onSpeak }) => {
   const [scale, setScale] = useState(30);
@@ -180,7 +181,7 @@ const Canvas: React.FC<CanvasProps> = ({ data, currentStepIndex, onDataUpdate, o
     e.currentTarget.releasePointerCapture(e.pointerId);
   };
 
-  if (!data) return <div ref={containerRef} className="flex-1 h-full bg-slate-50 flex items-center justify-center text-slate-400">📐 Nhập đề bài để bắt đầu</div>;
+  if (!data) return <div ref={containerRef} className="flex-1 h-full bg-slate-50 flex items-center justify-center text-slate-400 font-medium">📐 Nhập đề bài để bắt đầu học tập</div>;
 
   return (
     <div 
@@ -190,6 +191,7 @@ const Canvas: React.FC<CanvasProps> = ({ data, currentStepIndex, onDataUpdate, o
       onWheel={(e) => setScale(s => Math.min(Math.max(5, s * (1 - e.deltaY * 0.001)), 200))}
     >
       <svg width="100%" height="100%" className="absolute inset-0 pointer-events-none">
+        {/* Render Faces (Polygons) */}
         {(data.faces || []).map((face) => {
            const pathData = (face.pointIds || []).map((pid, idx) => {
              const pt = projectedPoints.get(pid); return pt ? `${idx === 0 ? 'M' : 'L'} ${pt.x} ${pt.y}` : '';
@@ -197,12 +199,38 @@ const Canvas: React.FC<CanvasProps> = ({ data, currentStepIndex, onDataUpdate, o
            return <path key={face.id} d={pathData} fill={face.color || '#cbd5e1'} fillOpacity={face.opacity || 0.2} stroke="none" />;
         })}
 
+        {/* Render Circles */}
+        {(data.circles || []).map((circle) => {
+          const center = projectedPoints.get(circle.centerId);
+          if (!center) return null;
+          const r = circle.radius * scale;
+          return (
+            <g key={circle.id}>
+              <circle
+                cx={center.x}
+                cy={center.y}
+                r={r}
+                fill="none"
+                stroke={circle.color || '#1e293b'}
+                strokeWidth="1.8"
+                strokeDasharray={circle.isDashed ? "5,5" : "none"}
+                className="transition-all duration-300"
+              />
+              {circle.label && (
+                <text x={center.x} y={center.y - r - 8} fontSize="11" fontWeight="600" textAnchor="middle" fill="#475569" style={{textShadow: '1px 1px 0 white'}}>
+                  {circle.label}
+                </text>
+              )}
+            </g>
+          );
+        })}
+
+        {/* Render Angles */}
         {(data.angles || []).map((angle) => {
            const center = data.points.find(p => p.id === angle.centerId);
            const p1 = data.points.find(p => p.id === angle.arm1Id);
            const p2 = data.points.find(p => p.id === angle.arm2Id);
            if (!center || !p1 || !p2) return null;
-           // Right angle symbol size: 0.3 units (compact)
            const sizeUnit = 0.3;
            const arm1Pt = getPointOnVector(center, p1, sizeUnit); 
            const arm2Pt = getPointOnVector(center, p2, sizeUnit);
@@ -220,6 +248,7 @@ const Canvas: React.FC<CanvasProps> = ({ data, currentStepIndex, onDataUpdate, o
            return <path key={angle.id} d={`M ${a1p.x} ${a1p.y} Q ${(a1p.x+a2p.x)/2} ${(a1p.y+a2p.y)/2} ${a2p.x} ${a2p.y}`} fill="none" stroke="#1e293b" strokeWidth="1" />;
         })}
 
+        {/* Render Edges */}
         {(data.edges || []).map((edge) => {
           const p1 = projectedPoints.get(edge.from); const p2 = projectedPoints.get(edge.to);
           if (!p1 || !p2) return null;
@@ -231,6 +260,7 @@ const Canvas: React.FC<CanvasProps> = ({ data, currentStepIndex, onDataUpdate, o
           );
         })}
 
+        {/* Render Points and Draggable Labels */}
         {data.points.map((point) => {
           const pt = projectedPoints.get(point.id);
           if (!pt) return null;
@@ -247,7 +277,7 @@ const Canvas: React.FC<CanvasProps> = ({ data, currentStepIndex, onDataUpdate, o
                   y={baseLabelPos.y + offset.dy} 
                   className={`text-sm font-bold fill-slate-800 select-none ${isDraggingLabel === point.id ? 'fill-blue-600' : ''}`}
                   textAnchor="middle" dominantBaseline="middle"
-                  style={{ pointerEvents: 'auto', cursor: 'move' }}
+                  style={{ pointerEvents: 'auto', cursor: 'move', textShadow: '1px 1px 0 white' }}
                 >
                   {point.label}
                 </text>
@@ -256,24 +286,25 @@ const Canvas: React.FC<CanvasProps> = ({ data, currentStepIndex, onDataUpdate, o
           );
         })}
 
+        {/* Render Freehand Drawings */}
         {(data.drawings || []).map(s => <polyline key={s.id} points={s.points.map(p => `${p.x},${p.y}`).join(' ')} fill="none" stroke={s.color} strokeWidth={s.width} strokeLinecap="round" strokeLinejoin="round" />)}
         {currentStroke.length > 0 && <polyline points={currentStroke.map(p => `${p.x},${p.y}`).join(' ')} fill="none" stroke={drawingColor} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />}
       </svg>
 
-      {/* Toolbar */}
+      {/* Toolbar Controls */}
       <div className="absolute top-4 right-4 flex flex-col gap-2 pointer-events-auto">
-        <button onClick={resetView} className="p-3 bg-white rounded-full shadow-lg border border-slate-200 text-slate-700 hover:bg-slate-50"><ResetIcon size={24} /></button>
-        <button onClick={() => setScale(s => s * 1.2)} className="p-3 bg-white rounded-full shadow-lg border border-slate-200 text-slate-700 hover:bg-slate-50"><ZoomIn size={24} /></button>
-        <button onClick={() => setScale(s => s / 1.2)} className="p-3 bg-white rounded-full shadow-lg border border-slate-200 text-slate-700 hover:bg-slate-50"><ZoomOut size={24} /></button>
+        <button onClick={resetView} className="p-3 bg-white rounded-full shadow-lg border border-slate-200 text-slate-700 hover:bg-slate-50 transition-colors" title="Về vị trí ban đầu"><ResetIcon size={24} /></button>
+        <button onClick={() => setScale(s => Math.min(s * 1.2, 200))} className="p-3 bg-white rounded-full shadow-lg border border-slate-200 text-slate-700 hover:bg-slate-50 transition-colors" title="Phóng to"><ZoomIn size={24} /></button>
+        <button onClick={() => setScale(s => Math.max(s / 1.2, 5))} className="p-3 bg-white rounded-full shadow-lg border border-slate-200 text-slate-700 hover:bg-slate-50 transition-colors" title="Thu nhỏ"><ZoomOut size={24} /></button>
         <div className="h-px bg-slate-200 my-1" />
-        <button onClick={() => { setIsPanMode(!isPanMode); setIsDrawingMode(false); }} className={`p-3 rounded-full shadow-lg border transition-colors ${isPanMode ? 'bg-blue-100 border-blue-400 text-blue-700' : 'bg-white border-slate-200 text-slate-700'}`}><Hand size={24} /></button>
-        <button onClick={() => { setIsDrawingMode(!isDrawingMode); setIsPanMode(false); }} className={`p-3 rounded-full shadow-lg border transition-colors ${isDrawingMode ? 'bg-amber-100 border-amber-400 text-amber-700' : 'bg-white border-slate-200 text-slate-700'}`}><PenTool size={24} /></button>
-        {data.drawings && data.drawings.length > 0 && <button onClick={() => onDataUpdate({...data, drawings: []})} className="p-3 bg-white text-red-500 rounded-full shadow-lg border border-slate-200 hover:bg-red-50"><Eraser size={24} /></button>}
+        <button onClick={() => { setIsPanMode(!isPanMode); setIsDrawingMode(false); }} className={`p-3 rounded-full shadow-lg border transition-colors ${isPanMode ? 'bg-blue-100 border-blue-400 text-blue-700' : 'bg-white border-slate-200 text-slate-700'}`} title="Di chuyển hình"><Hand size={24} /></button>
+        <button onClick={() => { setIsDrawingMode(!isDrawingMode); setIsPanMode(false); }} className={`p-3 rounded-full shadow-lg border transition-colors ${isDrawingMode ? 'bg-amber-100 border-amber-400 text-amber-700' : 'bg-white border-slate-200 text-slate-700'}`} title="Vẽ tự do"><PenTool size={24} /></button>
+        {data.drawings && data.drawings.length > 0 && <button onClick={() => onDataUpdate({...data, drawings: []})} className="p-3 bg-white text-red-500 rounded-full shadow-lg border border-slate-200 hover:bg-red-50 transition-colors" title="Xóa hình vẽ tự do"><Eraser size={24} /></button>}
       </div>
       
       {data.type === '3D' && !isDrawingMode && (
           <div className="absolute bottom-4 right-4 flex gap-2">
-              <button onClick={() => setAngleY(y => y + 15)} className="p-2 bg-white rounded-lg shadow border text-slate-600"><RotateCw size={20} /></button>
+              <button onClick={() => setAngleY(y => (y + 15) % 360)} className="p-2 bg-white rounded-lg shadow border text-slate-600 flex items-center gap-2 font-medium hover:bg-slate-50 transition-colors"><RotateCw size={20} /> Xoay 3D</button>
           </div>
       )}
     </div>

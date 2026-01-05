@@ -1,3 +1,4 @@
+
 export interface Point3D {
   id: string;
   x: number;
@@ -34,6 +35,15 @@ export interface Angle {
   label?: string;   // e.g. "60°"
 }
 
+export interface Circle {
+  id: string;
+  centerId: string;
+  radius: number; // Radius in geometry units
+  color?: string;
+  label?: string;
+  isDashed?: boolean;
+}
+
 export interface DrawingStep {
   stepNumber: number;
   description: string; // Vietnamese text
@@ -59,8 +69,9 @@ export interface GeometryData {
   edges: Edge[];
   faces: Face[];
   angles: Angle[];
+  circles?: Circle[]; // Added support for circles
   steps: DrawingStep[];
-  reasoning?: ReasoningStep[]; // New: Backward reasoning steps
+  reasoning?: ReasoningStep[]; // Step-by-step backward reasoning logic
   drawings?: FreehandStroke[]; 
   type: '2D' | '3D';
   message?: string; 
