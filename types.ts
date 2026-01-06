@@ -99,3 +99,4 @@ export interface Project {
   messages: ChatMessage[];
   lastModified: number;
 }
+
