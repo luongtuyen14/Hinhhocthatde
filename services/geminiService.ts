@@ -191,3 +191,4 @@ export const generateGeometry = async (prompt: string, history: string = "", ima
     throw error;
   }
 };
+
